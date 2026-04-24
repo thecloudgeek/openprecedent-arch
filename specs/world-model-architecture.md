@@ -82,7 +82,12 @@ Capabilities are the atomic building blocks. Each is a single well-defined primi
 Capabilities we have today, built in service of the user:
 
 - **Hybrid search over the corpus** — fast, accurate retrieval across 12.9M chunks of law. The user doesn't call this. The intelligence layer does, on their behalf, with their situation as context.
-- **Citation graph traversal** — which cases rely on which, which have been overruled, which authority weighs more where. The user doesn't see citations-by-citations. They see "this is still good law" or "don't rely on this — it was overruled last year."
+- **Citation graph traversal** — which cases rely on which, how the citing court treated them, and which authority weighs more where. Treatment is a spectrum of trust, not a single label:
+    - _Deterministic_ signals — editor-curated subsequent history (reversed, overruled, superseded) from sources like CourtListener. Highest confidence; surfaced directly.
+    - _Extractive_ signals — Bluebook signals ("but see," "but cf.") and treatment verbs ("declining to follow," "abrogated by") pulled verbatim from the citing sentence. Shown as quotation, not interpretation.
+    - _Inferred_ signals — LLM-classified treatment. Multi-label, calibrated, abstention-first, withheld below per-category confidence thresholds (strong picks need a higher bar than descriptive). Never surfaced without the evidence it was derived from.
+
+    The user doesn't see citations-by-citations. They see "this is still good law," "the Ninth Circuit distinguished this last year," or — when the evidence doesn't support a confident read — "this case's treatment is contested; here's the citing sentence, read it yourself." That last state is not a failure mode; it is a first-class output (see _Abstention as a First-Class Output_ below).
 - **Court and jurisdiction metadata** — so when the user mentions a city or pastes a court document, we know which law applies to them.
 - **Case metadata enrichment** — so answers can say "the California Supreme Court held in 2023..." instead of returning a URL.
 - **Synthesis** — plain-English answers grounded in real law, with the trusted-friend-who-went-to-law-school tone.
@@ -160,6 +165,26 @@ When those come up in future roadmap discussions, the answer is: different audie
 
 ---
 
+## Abstention as a First-Class Output
+
+"Precision over recall" is not the right frame for this user. The right frame is **abstain over guess**.
+
+A confidently wrong answer to a pro se litigant — a "still good law" badge on a case that has been overruled, or an "overruled" badge on a case only distinguished in dicta — can cost them their home, their kid, or their status. They cannot pattern-match the answer against specifics the way an attorney can. The failure mode is asymmetric: a missed signal is a gap; a wrong signal delivered with confidence is an injury.
+
+So the architecture treats "I don't know" as a first-class output of every capability and every interface. When the evidence doesn't support a confident synthesis, the system surfaces the _evidence itself_ — the subsequent-history edge, the signal phrase, the citing sentence, the pasted statute — and invites the user to read it, rather than handing them a guess dressed up as a conclusion.
+
+This is also the safer side of the UPL line. Showing a court's words is information; synthesizing a novel judgment about "what this means for you" edges toward advice. Both the legal posture and the product posture converge on the same design: when in doubt, surface evidence, not synthesis.
+
+Three concrete rules that follow:
+
+- **Never show a synthesized label without the evidence behind it.** A "treatment" tag shipped without the quoted signal phrase or the citing sentence is not allowed.
+- **"Uncertain" and "pending" are distinct states.** "Pending" means the system hasn't run; "uncertain" means it ran and abstained. The UI must distinguish them.
+- **Deterministic beats inferred wherever both exist.** If CourtListener has an editor-curated "overruled by" edge, that is what the user sees — not an LLM's read of the parenthetical.
+
+This principle is binding on every capability, every interface, and every proactive signal.
+
+---
+
 ## How We Plan on Using It
 
 This architecture is not just a description. It determines how we build and how the product behaves.
@@ -195,7 +220,8 @@ And for this user specifically, the moat is even deeper: we are the only legal t
 - **Not an agent framework rebrand.** Agents are a tactic; the world model is the asset.
 - **Not a knowledge graph product.** The graph is an implementation detail.
 - **Not a reason to delay shipping.** The current system keeps improving while the world model gets built underneath. Evolution, not rewrite.
-- **Not a commitment to ambient monitoring from day one.** v1 of user-side understanding is minimal — remember what the user told us, carry it across sessions, warn on obvious deadlines. Ambient inference and proactive monitoring come next.
+- **Not a commitment to ambient monitoring from day one.** v1 of user-side understanding is intentionally bounded — remember what the user told us, carry it across sessions, and watch the clock on any deadline they've named or that we've extracted from a document they've uploaded. Deadline-awareness is v1, not a later addition: for this user, it is the single feature that most distinguishes accompaniment from Q&A, and a missed response window is the difference between keeping and losing the thing at stake. Ambient _inference_ of situation facts (jurisdiction from zip code, posture from narrative) and authority/jurisdiction watching come next.
+- **Not legal advice.** OP surfaces evidence rather than prescribing action. The full product-and-legal-posture argument — including the unauthorized-practice-of-law line and why evidence-first is both safer and more truthful for this user — lives in _Abstention as a First-Class Output_ above.
 - **Not a pitch to enterprise legal.** When the architecture makes us look like we could serve attorneys, that is incidental. We built this for someone else.
 
 ---
