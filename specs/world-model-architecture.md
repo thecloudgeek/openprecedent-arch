@@ -87,6 +87,7 @@ Capabilities we have today, built in service of the user:
 - **Case metadata enrichment** — so answers can say "the California Supreme Court held in 2023..." instead of returning a URL.
 - **Synthesis** — plain-English answers grounded in real law, with the trusted-friend-who-went-to-law-school tone.
 - **Parenthetical extraction** — court-written summaries so we show the user what a case actually said, not our paraphrase.
+- **Treatment classification** — every parenthetical gets labeled with the relationship it signals (followed / distinguished / overruled / superseded / criticized / harmonized / descriptive / other). Classified on demand, cached permanently; user traffic warms the graph. This is the primitive that turns a flat citation map into a live treatment graph, which is what the world model actually needs.
 - **Eval harness** — so we can measure whether our answers are right, not just confident.
 
 Capabilities we need to build, each driven by an unmet need of this user:
@@ -103,7 +104,9 @@ Capabilities are built in response to unmet intelligence-layer needs. No capabil
 
 The world model is the structured understanding, layered on top of raw data, that lets the intelligence layer reason.
 
-**On the law side**, the world model is the difference between a pile of documents and a live map of what binds who, where, and when. Doctrine taxonomies. Treatment graphs. Live-vs-dormant classifications. Temporal state so we can answer "what was the law on the date the user signed the lease." We have the substrate. We have maybe 20% of the structured understanding. The rest is a real engineering investment, and it's the investment that keeps our user safe from confidently wrong answers.
+**On the law side**, the world model is the difference between a pile of documents and a live map of what binds who, where, and when. Doctrine taxonomies. Treatment graphs. Live-vs-dormant classifications. Temporal state so we can answer "what was the law on the date the user signed the lease." We have the substrate. Treatment classification is the first world-model primitive that's actually shipping, built on the cache-first on-demand pattern described below. We have maybe a quarter of the structured understanding; the rest is a real engineering investment, and it's the investment that keeps our user safe from confidently wrong answers.
+
+**Cache-first, demand-driven world-model primitives.** The treatment graph established a pattern worth naming: expensive world-model signals (LLM-classified treatments, situation extractions, authority scores) are computed lazily on the path the user actually walks, written to a permanent cache, and re-served from cache on every subsequent hit. A background sweep over the uncovered long tail becomes a separate decision, made only when the cached coverage proves the primitive is worth the spend. This keeps world-model investment aligned with evidence: we don't pay for understanding we don't yet know users will use, and every dollar spent is on a case a user actually touched. Expect future world-model primitives (live-vs-dormant classification, jurisdictional binding resolution) to inherit this pattern.
 
 **On the user side**, the world model holds the user's situation as the system understands it. It is built ambiently, from conversation and uploaded documents, not by asking the user to fill out a form. It knows:
 
