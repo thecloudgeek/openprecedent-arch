@@ -85,7 +85,7 @@ Capabilities we have today, built in service of the user:
 - **Citation graph traversal** — which cases rely on which, how the citing court treated them, and which authority weighs more where. Treatment is a spectrum of trust, not a single label:
     - _Deterministic_ signals — editor-curated subsequent history (reversed, overruled, superseded) from sources like CourtListener. Highest confidence; surfaced directly.
     - _Extractive_ signals — Bluebook signals ("but see," "but cf.") and treatment verbs ("declining to follow," "abrogated by") pulled verbatim from the citing sentence. Shown as quotation, not interpretation.
-    - _Inferred_ signals — LLM-classified treatment. Multi-label, calibrated, abstention-first, hidden from the user below a confidence threshold. Never surfaced without the evidence it was derived from.
+    - _Inferred_ signals — LLM-classified treatment. Multi-label, calibrated, abstention-first, withheld below per-category confidence thresholds (strong picks need a higher bar than descriptive). Never surfaced without the evidence it was derived from.
 
     The user doesn't see citations-by-citations. They see "this is still good law," "the Ninth Circuit distinguished this last year," or — when the evidence doesn't support a confident read — "this case's treatment is contested; here's the citing sentence, read it yourself." That last state is not a failure mode; it is a first-class output (see _Abstention as a First-Class Output_ below).
 - **Court and jurisdiction metadata** — so when the user mentions a city or pastes a court document, we know which law applies to them.
@@ -181,7 +181,7 @@ Three concrete rules that follow:
 - **"Uncertain" and "pending" are distinct states.** "Pending" means the system hasn't run; "uncertain" means it ran and abstained. The UI must distinguish them.
 - **Deterministic beats inferred wherever both exist.** If CourtListener has an editor-curated "overruled by" edge, that is what the user sees — not an LLM's read of the parenthetical.
 
-Every capability, every interface, every proactive signal is built against this principle.
+This principle is binding on every capability, every interface, and every proactive signal.
 
 ---
 
