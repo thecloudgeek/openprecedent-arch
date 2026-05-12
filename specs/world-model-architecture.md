@@ -7,6 +7,22 @@
 
 ---
 
+## How to read this
+
+If you're a fresh agent picking up Open Precedent work, this document is the architectural framing every other spec hangs off. Read it before touching treatment, citation-graph, or synthesis code in `openprecedent-backend` or `openprecedent-pipeline`.
+
+Structure in priority order:
+
+1. **Who Open Precedent Is For** — the user this entire architecture is built against. Every design tradeoff is decided in this user's favor.
+2. **The What / The Why / The Four Layers** — the world-model framing itself: Capabilities → World Model → Intelligence → Interfaces.
+3. **Abstention as a First-Class Output** — binding principle on every capability, interface, and proactive signal. Four concrete rules. The fourth (*Validate against deployment distribution*) is the most recently added and links to a worked example from May 2026.
+4. **How We Plan on Using It** — engineering posture. Names the user-side world model as the architectural top priority and the largest unstarted investment.
+5. **What This Is Not / Honest Caveats / Success Criteria** — guardrails.
+
+Specs that operationalize this framing live in `openprecedent-backend/docs/specs/` — see that directory's [`README.md`](https://github.com/thecloudgeek/openprecedent-backend/blob/main/docs/specs/README.md) for the treatment-signal stack index. Loader code lives in `openprecedent-pipeline/scripts/`.
+
+---
+
 ## Who Open Precedent Is For
 
 Open Precedent is built for people facing a legal situation they cannot afford professional help for, where the outcome materially shapes their life.
@@ -83,7 +99,7 @@ Capabilities we have today, built in service of the user:
 
 - **Hybrid search over the corpus** — fast, accurate retrieval across 12.9M chunks of law. The user doesn't call this. The intelligence layer does, on their behalf, with their situation as context.
 - **Citation graph traversal** — which cases rely on which, how the citing court treated them, and which authority weighs more where. Treatment is a spectrum of trust, not a single label:
-    - _Deterministic_ signals — editor-curated subsequent history (reversed, overruled, superseded) from sources like CourtListener. Highest confidence; surfaced directly.
+    - _Deterministic_ signals — produced by mechanisms with no probabilistic step: hand-curated lists (CRS R45319), structured fields where they exist, or pattern extractors over opinion HTML. "Deterministic" describes the *mechanism*, not the trust level — a regex extractor producing noise is still noise. A deterministic signal is highest-confidence and surfaced directly **when the source is editor-curated or when the extractor's precision has been measured against a representative sample of its deployment distribution** (see _Validate against deployment distribution_ below). Pattern-extractor output is **candidate-tier** until that measurement is in.
     - _Extractive_ signals — Bluebook signals ("but see," "but cf.") and treatment verbs ("declining to follow," "abrogated by") pulled verbatim from the citing sentence. Shown as quotation, not interpretation.
     - _Inferred_ signals — LLM-classified treatment. Multi-label, calibrated, abstention-first, withheld below per-category confidence thresholds (strong picks need a higher bar than descriptive). Never surfaced without the evidence it was derived from.
 
@@ -175,11 +191,12 @@ So the architecture treats "I don't know" as a first-class output of every capab
 
 This is also the safer side of the UPL line. Showing a court's words is information; synthesizing a novel judgment about "what this means for you" edges toward advice. Both the legal posture and the product posture converge on the same design: when in doubt, surface evidence, not synthesis.
 
-Three concrete rules that follow:
+Four concrete rules that follow:
 
 - **Never show a synthesized label without the evidence behind it.** A "treatment" tag shipped without the quoted signal phrase or the citing sentence is not allowed.
 - **"Uncertain" and "pending" are distinct states.** "Pending" means the system hasn't run; "uncertain" means it ran and abstained. The UI must distinguish them.
 - **Deterministic beats inferred wherever both exist.** If CourtListener has an editor-curated "overruled by" edge, that is what the user sees — not an LLM's read of the parenthetical.
+- **Validate against deployment distribution.** A precision claim measured on a non-representative sample is a guess dressed up as a measurement. Until a signal is validated against samples drawn from its full deployment distribution (or stratified across known sub-populations — jurisdiction, court level, source type), it is **candidate-tier**, not its target tier. Any tier's signal may be in one of two states: *candidate* (extraction works, deployment precision unmeasured or below threshold) or *validated* (precision measured against a representative sample, meets the tier's threshold). User-facing surfaces consume only validated signals; candidate signals exist in the data layer for audit but are excluded from synthesis. The May 2026 text-pattern loader audit is the cautionary tale — 98.3% precision claimed on a federally-biased FTS-funnel sample, ~53% precision discovered at full corpus. See [treatment-tier-1-text-pattern.md §Post-implementation audit history](https://github.com/thecloudgeek/openprecedent-backend/blob/main/docs/specs/treatment-tier-1-text-pattern.md#post-implementation-audit-history) for the worked example.
 
 This principle is binding on every capability, every interface, and every proactive signal.
 
@@ -202,6 +219,8 @@ Three shifts in how the team works.
 **The backlog reframes around what the user needs.** Issues take the form "the intelligence layer needed to do X for a user in situation Y, and capability Z was missing or insufficient." Not "build feature A." The failure to serve a user becomes the signal for what to build next. No capability is built without a user-facing consumer. No capability is kept without evidence it serves users.
 
 **The user-side world model becomes the top engineering priority.** Not a better model. Not more chunks. Not more data sources. Without an understanding of the user's situation, every other investment has a ceiling. With it, every other investment compounds.
+
+Current investment is concentrated in law-side capabilities (citation graph, treatment signals, parenthetical synthesis). The user-side world model — situation extraction, deadline tracking, document parsing — remains the architectural top priority and the largest unstarted investment. Any spec touching law-side work should note the user-side gap in its "What's NOT in this PR" section so the imbalance stays visible.
 
 **The team shape flattens.** Deep individual contributors on capabilities (search, graph, evals, pipeline, parsing, deadline math). Directly-responsible individuals on cross-cutting outcomes (close the 22% court-metadata gap; ship situation awareness v1; ship deadline watcher; ship the document uploader). No middle layer whose job is routing information — the world model does that.
 
