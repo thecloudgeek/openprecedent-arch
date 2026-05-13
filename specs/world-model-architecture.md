@@ -222,6 +222,8 @@ Three shifts in how the team works.
 
 Current investment is concentrated in law-side capabilities (citation graph, treatment signals, parenthetical synthesis). The user-side world model — situation extraction, deadline tracking, document parsing — remains the architectural top priority and the largest unstarted investment. Any spec touching law-side work should note the user-side gap in its "What's NOT in this PR" section so the imbalance stays visible.
 
+**Sequencing.** The near-term path is to ship the simplest usable form of the product (the research surface that already exists) to first users and validate that the user this doc describes will actually use it. User-side world model work — deadline-awareness v1, situation extraction, document parsing — follows once usage is real, not before. This is sequencing, not deprioritization: the user-side investment remains the top long-term priority, but it cannot be justified ahead of any evidence that the product has product-market fit with the user it's built for. The 2026-05-12 audit named the immediate corpus gap (state statutes for pro se users) as the first thing that has to land before launch — that work is the focused cut tracked in [`path-b-state-statutes.md`](https://github.com/thecloudgeek/openprecedent-backend/blob/main/docs/specs/path-b-state-statutes.md).
+
 **The team shape flattens.** Deep individual contributors on capabilities (search, graph, evals, pipeline, parsing, deadline math). Directly-responsible individuals on cross-cutting outcomes (close the 22% court-metadata gap; ship situation awareness v1; ship deadline watcher; ship the document uploader). No middle layer whose job is routing information — the world model does that.
 
 ### As a differentiation strategy
