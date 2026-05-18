@@ -604,7 +604,7 @@
     <a href="#s1">System Architecture</a>
     <a href="#s2">Frontend</a>
     <a href="#s3">Backend API</a>
-    <a href="#s4">Agent System</a>
+    <a href="#s4">AI Synthesis</a>
     <a href="#s5">Data Pipeline</a>
     <a href="#s6">Database</a>
     <a href="#s7">Infrastructure</a>
@@ -630,11 +630,11 @@
         <div class="kpi-card__label">Repositories</div>
       </div>
       <div class="kpi-card anim-scale" style="--i:4">
-        <div class="kpi-card__value c-indigo">10</div>
-        <div class="kpi-card__label">Agent Tools</div>
+        <div class="kpi-card__value c-indigo">13.5M</div>
+        <div class="kpi-card__label">Corpus Chunks</div>
       </div>
       <div class="kpi-card anim-scale" style="--i:5">
-        <div class="kpi-card__value c-amber">4</div>
+        <div class="kpi-card__value c-amber">6</div>
         <div class="kpi-card__label">Data Sources</div>
       </div>
       <div class="kpi-card anim-scale" style="--i:6">
@@ -666,15 +666,14 @@ graph TD
 
   subgraph BE["Backend — FastAPI"]
     API["REST API /v1/*"]
-    SEARCH["Search Engine"]
-    AGENT["Agent Harness"]
-    SYNTH["AI Synthesis"]
+    EMBED_Q["Query Embedder"]
+    SEARCH["Hybrid Search"]
+    SYNTH["Vertex Gemini Synthesis"]
     AUTH_BE["JWT Validation"]
   end
 
   subgraph DB["PostgreSQL + pgvector"]
     CHUNKS["embedding_chunks"]
-    DOCS["documents"]
     CITATIONS["citation_edges"]
     SESSIONS["chat_sessions"]
   end
@@ -688,25 +687,24 @@ graph TD
 
   subgraph EXT["External Services"]
     AUTH0["Auth0"]
-    CL["CourtListener API"]
-    LLM["LLM Providers"]
+    CL["CourtListener bulk"]
+    LLM["Vertex AI (Gemini)"]
     EDGAR_E["SEC EDGAR"]
   end
 
   UI -->|"JWT bearer"| API
   AUTH_FE -->|"OIDC"| AUTH0
   AUTH_BE -->|"JWKS verify"| AUTH0
-  API --> SEARCH
-  API --> AGENT
+  API --> EMBED_Q
+  EMBED_Q --> SEARCH
   SEARCH -->|"hybrid query"| CHUNKS
-  AGENT -->|"tool calls"| CL
-  AGENT -->|"tool calls"| EDGAR_E
-  AGENT -->|"complete()"| LLM
-  SYNTH -->|"synthesize()"| LLM
   SEARCH --> SYNTH
+  SYNTH -->|"synthesize()"| LLM
   SSE_FE -.->|"stream"| API
 
   READ -->|"CSV/API"| CHUNK
+  READ -.->|"bulk pull"| CL
+  READ -.->|"bulk pull"| EDGAR_E
   CHUNK --> EMBED
   EMBED -->|"batch insert"| STORE
   STORE --> CHUNKS
@@ -892,8 +890,8 @@ graph TD
           <tbody>
             <tr><td><code>GET</code></td><td><code>/v1/search</code></td><td><span class="tag tag-slate">Optional</span></td><td>Hybrid search with jurisdiction/date/type filters</td></tr>
             <tr><td><code>GET</code></td><td><code>/v1/research/stream</code></td><td><span class="tag tag-slate">Optional</span></td><td>SSE streaming search + AI synthesis</td></tr>
-            <tr><td><code>POST</code></td><td><code>/v1/chat</code></td><td><span class="tag tag-emerald">Required</span></td><td>Multi-turn agentic chat with tool use</td></tr>
-            <tr><td><code>POST</code></td><td><code>/v1/agent/research</code></td><td><span class="tag tag-emerald">Required</span></td><td>One-shot agent research</td></tr>
+            <tr><td><code>POST</code></td><td><code>/v1/chat</code></td><td><span class="tag tag-emerald">Required</span></td><td>Multi-turn chat with citation-grounded synthesis</td></tr>
+            <tr><td><code>GET</code></td><td><code>/v1/research</code></td><td><span class="tag tag-slate">Optional</span></td><td>One-shot research query (synchronous variant of /research/stream)</td></tr>
             <tr><td><code>GET</code></td><td><code>/v1/documents/{id}</code></td><td><span class="tag tag-slate">Optional</span></td><td>Full document detail + chunks</td></tr>
             <tr><td><code>GET</code></td><td><code>/v1/citations/{id}</code></td><td><span class="tag tag-slate">Optional</span></td><td>Citation graph for a document</td></tr>
             <tr><td><code>POST</code></td><td><code>/v1/users/sync</code></td><td><span class="tag tag-emerald">Required</span></td><td>Sync Auth0 profile to backend</td></tr>
@@ -945,7 +943,7 @@ graph TD
     </div>
 
     <!-- ========== SECTION 4: AGENT ========== -->
-    <div id="s4" class="sec-head anim c-violet" style="--i:22"><span class="dot dot-violet"></span> Agent System</div>
+    <div id="s4" class="sec-head anim c-violet" style="--i:22"><span class="dot dot-violet"></span> AI Synthesis</div>
 
     <div class="mermaid-wrap anim" style="--i:23">
       <div class="zoom-controls">
@@ -956,83 +954,35 @@ graph TD
       <pre class="mermaid">
 graph TD
   MSG["User Message"] --> INJECT{"Injection Check"}
-  INJECT -->|"pass"| ROUTE["Domain Router"]
+  INJECT -->|"pass"| EMBED_Q["BGE Query Embedder"]
   INJECT -->|"fail"| REJECT["400 Rejected"]
-  ROUTE --> SKILL["Skill Composer"]
-  SKILL --> LOOP["Agent Loop"]
-  LOOP --> LLM["LLM Provider"]
-  LLM -->|"tool_use"| EXEC["Tool Executor"]
-  LLM -->|"end_turn"| CITE["Citation Validator"]
-  EXEC -->|"results"| LOOP
+  EMBED_Q --> SEARCH["Hybrid Search<br/>(pgvector + FTS + RRF)"]
+  SEARCH -->|"top-k chunks"| SYNTH["Vertex Gemini Synthesis"]
+  SYNTH --> CITE["Citation Validator"]
   CITE --> STREAM["SSE Stream"]
-  LOOP -->|"guardrail hit"| FORCE["Forced Synthesis"]
-  FORCE --> CITE
       </pre>
     </div>
 
-    <div class="section anim b-violet" style="--i:24">
-      <div class="section-label c-violet"><span class="dot"></span> Agent Tools (10)</div>
-      <div class="inner-grid">
-        <div class="inner-card">
-          <div class="title">Case Law</div>
-          <div class="desc">
-            <code>courtlistener_search</code> &mdash; primary via CourtListener API<br>
-            <code>case_search</code> &mdash; local pgvector fallback<br>
-            <code>citation_lookup</code> &mdash; find by citation/name<br>
-            <code>citation_graph_traverse</code> &mdash; citation network
-          </div>
-        </div>
-        <div class="inner-card">
-          <div class="title">Statutes &amp; Regulations</div>
-          <div class="desc">
-            <code>statute_search</code> &mdash; state/federal statutes<br>
-            <code>regulation_search</code> &mdash; regulatory codes<br>
-            <code>ecfr_search</code> &mdash; eCFR lookup<br>
-            <code>federal_register_search</code> &mdash; Fed Register
-          </div>
-        </div>
-        <div class="inner-card">
-          <div class="title">Contracts</div>
-          <div class="desc">
-            <code>contract_search</code> &mdash; SEC EDGAR material contracts (Exhibit 10.x filings)
-          </div>
-        </div>
-        <div class="inner-card">
-          <div class="title">Meta</div>
-          <div class="desc">
-            <code>evaluate_research</code> &mdash; agent self-evaluation before synthesis. Guardrails: iteration limit, tool call limit, cost cap, timeout.
-          </div>
-        </div>
-      </div>
+    <div class="callout anim" style="--i:24; border-left-color: var(--violet);">
+      <strong>No multi-agent harness.</strong> The previous tool-using agent loop (domain router, skill composer, agent tools, evaluator) was retired. <code>backend/app/agent/skills/</code> and <code>backend/app/agent/tools/</code> are now empty. The user-facing flow is straight-line: embed the query, run hybrid search over <code>embedding_chunks</code>, hand top-k results to Vertex Gemini for synthesis, validate citations, stream via SSE. Agent-style composition is deferred until the user-side world model exists to compose against.
     </div>
 
     <div class="section anim b-violet" style="--i:25">
       <div class="section-label c-violet"><span class="dot"></span> LLM Providers</div>
       <div class="inner-grid">
         <div class="inner-card">
-          <div class="title">Anthropic</div>
-          <div class="desc">Claude models via direct API. Default for synthesis. <code>OP_ANTHROPIC_API_KEY</code></div>
+          <div class="title">Vertex AI (Gemini)</div>
+          <div class="desc">Default synthesis provider. Uses GCP auth (no API key). Gemini handles the chat-completion + citation-grounded synthesis step.</div>
         </div>
         <div class="inner-card">
-          <div class="title">Vertex AI</div>
-          <div class="desc">Anthropic models via GCP Vertex. Uses GCP auth (no API key). Default agent provider.</div>
-        </div>
-        <div class="inner-card">
-          <div class="title">Google Gemini</div>
-          <div class="desc">Gemini 2.5 Flash. <code>OP_GEMINI_API_KEY</code>. Synthesis fallback when Anthropic unavailable.</div>
+          <div class="title">Anthropic Claude</div>
+          <div class="desc">Available via direct API for synthesis. <code>OP_ANTHROPIC_API_KEY</code>. Used for spec/eval work, not the default user-facing path.</div>
         </div>
         <div class="inner-card">
           <div class="title">OpenAI</div>
-          <div class="desc">OpenAI API. <code>OP_OPENAI_API_KEY</code>. Available as alternative provider.</div>
+          <div class="desc">OpenAI API. <code>OP_OPENAI_API_KEY</code>. Available as alternative provider; not default.</div>
         </div>
       </div>
-    </div>
-
-    <div class="callout anim" style="--i:26; border-left-color: var(--violet);">
-      <strong>Domain Routing.</strong> The agent router classifies queries into domains
-      (<code>case_law</code>, <code>statutory</code>, <code>contracts</code>, <code>general</code>)
-      via keyword-based classification. Each domain maps to a <code>Skill</code> object that determines which tools
-      are exposed and injects domain-specific instructions into the system prompt.
     </div>
 
     <!-- ========== SECTION 5: PIPELINE ========== -->
@@ -1065,23 +1015,31 @@ graph TD
     </div>
 
     <div class="section anim b-amber" style="--i:29">
-      <div class="section-label c-amber"><span class="dot"></span> Data Sources</div>
+      <div class="section-label c-amber"><span class="dot"></span> Data Sources (13.5M chunks)</div>
       <div class="inner-grid">
         <div class="inner-card">
-          <div class="title">CourtListener</div>
-          <div class="desc">Court opinions — bz2-compressed CSV bulk data + REST API for delta ingestion. Rate-limited to 2 req/sec for polite crawling.</div>
+          <div class="title">CourtListener — 12.6M chunks</div>
+          <div class="desc">Federal case law to 2025-12-31. bz2-compressed CSV bulk data + REST API for delta ingestion. Rate-limited to 2 req/sec.</div>
         </div>
         <div class="inner-card">
-          <div class="title">SEC EDGAR</div>
-          <div class="desc">Material contracts (Exhibit 10.x filings). Business agreements, licenses, employment contracts.</div>
+          <div class="title">Municipal Codes — 581K chunks</div>
+          <div class="desc">846 cities via JusticeDAO. Major-metro coverage (Houston, Dallas, LA, SF, NYC, etc.) still missing — Path B expansion targets that gap.</div>
         </div>
         <div class="inner-card">
-          <div class="title">CFR</div>
+          <div class="title">CFR — 182K chunks</div>
           <div class="desc">Code of Federal Regulations. Regulatory sections parsed and chunked for embedding.</div>
         </div>
         <div class="inner-card">
-          <div class="title">Statutes</div>
-          <div class="desc">State and federal statutes. Structured legal text with section hierarchy preserved.</div>
+          <div class="title">SEC EDGAR — 106K chunks</div>
+          <div class="desc">Material contracts (Exhibit 10.x filings). Business agreements, licenses, employment contracts.</div>
+        </div>
+        <div class="inner-card">
+          <div class="title">USC — 15K chunks</div>
+          <div class="desc">United States Code. Federal statutes with section hierarchy preserved.</div>
+        </div>
+        <div class="inner-card">
+          <div class="title">State Regulations — 27K chunks</div>
+          <div class="desc">Delaware only today (Tier 1 canary). VA/NC/TX/NY rollout deferred to Path B. No state statutes yet — primary corpus gap for the pro se user.</div>
         </div>
       </div>
     </div>
@@ -1258,16 +1216,15 @@ erDiagram
             <tr><td></td><td>asyncpg</td><td>Async PostgreSQL driver (no ORM)</td></tr>
             <tr><td></td><td>structlog</td><td>Structured logging (JSON/console)</td></tr>
             <tr><td></td><td>sentence-transformers</td><td>BGE-large-en-v1.5 query embedding</td></tr>
-            <tr><td><strong>AI</strong></td><td>Anthropic Claude</td><td>Primary synthesis + agent reasoning</td></tr>
-            <tr><td></td><td>Google Gemini</td><td>Agent + synthesis fallback</td></tr>
-            <tr><td></td><td>Vertex AI</td><td>Claude via GCP (default agent provider)</td></tr>
+            <tr><td><strong>AI</strong></td><td>Vertex AI (Gemini)</td><td>Default synthesis provider via GCP auth</td></tr>
+            <tr><td></td><td>Anthropic Claude</td><td>Available for synthesis; used for spec/eval work, not default user path</td></tr>
             <tr><td></td><td>OpenAI</td><td>Alternative provider option</td></tr>
             <tr><td><strong>Search</strong></td><td>pgvector (cosine)</td><td>Vector similarity search (1024-dim)</td></tr>
             <tr><td></td><td>PostgreSQL tsvector</td><td>Full-text search with GIN index</td></tr>
             <tr><td></td><td>Reciprocal Rank Fusion</td><td>Score merging (k=60)</td></tr>
             <tr><td><strong>Pipeline</strong></td><td>Prefect v2</td><td>Flow orchestration with retry + resume</td></tr>
             <tr><td></td><td>BGE-large-en-v1.5</td><td>1024-dim embeddings (MPS/fp16)</td></tr>
-            <tr><td></td><td>CourtListener, EDGAR, CFR</td><td>Legal data sources</td></tr>
+            <tr><td></td><td>CourtListener, Municipal codes, CFR, EDGAR, USC, State regs</td><td>Legal data sources (13.5M chunks total)</td></tr>
             <tr><td><strong>Infra</strong></td><td>Docker Compose, Kustomize</td><td>Local dev + K8s deployment</td></tr>
             <tr><td></td><td>pgvector/pgvector:pg17</td><td>PostgreSQL 17 with vector extension</td></tr>
             <tr><td></td><td>Cloudflare Tunnel, Traefik</td><td>Networking + reverse proxy</td></tr>
